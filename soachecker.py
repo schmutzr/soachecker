@@ -24,8 +24,8 @@ config.read("soachecker.conf")
 local_nets = [ ipaddress.ip_network(x) for x in json.loads(config["soachecker"]["local_nets"]) ]
 stop_list = [ re.compile(x) for x in json.loads(config["soachecker"]["stop_list"]) ]
 cache_clean_interval = config["soachecker"]["cache_clean_interval"]
-resolver_timeout = int(config["soachecker"]["resolver_timeout"])
-resolver_lifetime = int(config["soachecker"]["resolver_lifetime"])
+resolver_timeout = float(config["soachecker"]["resolver_timeout"])
+resolver_lifetime = float(config["soachecker"]["resolver_lifetime"])
 passivedns_log_file = config["soachecker"]["passivedns_log_file"] 
 passivedns_separator = config["soachecker"]["passivedns_separator"]
 passivedns_separator = "\t"
