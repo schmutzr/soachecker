@@ -26,14 +26,13 @@ stop_list = [ re.compile(x) for x in json.loads(config["soachecker"]["stop_list"
 cache_clean_interval = config["soachecker"]["cache_clean_interval"]
 resolver_timeout = float(config["soachecker"]["resolver_timeout"])
 resolver_lifetime = float(config["soachecker"]["resolver_lifetime"])
-passivedns_log_file = config["soachecker"]["passivedns_log_file"] 
-passivedns_separator = config["soachecker"]["passivedns_separator"]
-passivedns_separator = "\t"
+input_log_file = config["soachecker"]["input_log_file"] 
+input_type = config["soachecker"]["input_type"]
 
 trigger_query_types = json.loads(config["soachecker"]["trigger_query_types"])
 
 maxlines = int(config["soachecker"]["maxlines"])
-passivedns_skip_re = re.compile(config["soachecker"]["passivedns_skip_re"])
+input_skip_re = re.compile(config["soachecker"]["input_skip_re"])
 
 
 # LOGGING
@@ -90,7 +89,9 @@ class WorkerPool:
         print("request_qsize={}, result_qsize={}, workers={} \n".format(self.request_queue.qsize(), self.result_queue.qsize(), threading.active_count()))
         logger.info("request_qsize=%d, result_qsize=%d, workers=%d \n", self.request_queue.qsize(), self.result_queue.qsize(), threading.active_count())
         if self.report_func != None:
-            self.report_func()
+            report = self.report_func()
+            print(report)
+            logger.info(report)
 
     def start(self):
         self.status_timer()
@@ -205,7 +206,7 @@ def cleanup_cache():
    cache =  { key:expires for key,expires in cache.items() if expires<now }
 
 def report_stats():
-    print(counter)
+    return str(counter)
 #    for key in counter:
 #       print("\t{}:\t{}".format(key, counter[key]))
 
@@ -215,16 +216,19 @@ linecount = 0
 wp = WorkerPool(worker_func=fetch_soa, collector_func=manage_cache, report_func=report_stats, numworkers=300)
 wp.start()
 
-# bro/zeek dns.log format:
-#fields ts      uid     id.orig_h       id.orig_p       id.resp_h       id.resp_p       proto   trans_id        rtt     query   qclass  qclass_name     qtype   qtype_name      rcode   rcode_name      AA      TC      RD      RA      Z       answers TTLs    rejected
-#types  time    string  addr    port    addr    port    enum    count   interval        string  count   string  count   string  count   string  bool    bool    bool    bool    count   vector[string]  vector[interval]        bool
-
-for line in Pygtail(passivedns_log_file, offset_file="pygtail.offset"):
-   if passivedns_skip_re.match(line):
+for line in Pygtail(input_log_file, offset_file="pygtail.offset"):
+   if input_skip_re.match(line):
        continue
-   #(timestamp, client_ip, server_ip, qclass, query, qtype, answer, ttl, whut) = line.split(passivedns_separator)
-   (ts, uid, id_orig_h, id_orig_p, id_resp_h, id_resp_p, proto, trans_id, rtt, query, qclass, qclass_name, qtype, qtype_name, rcode, rcode_name, AA, TC, RD, RA, Z, answers, TTLs, rejected) = line.split(passivedns_separator)
-   (qtype, client_ip, query) = (qtype_name, id_orig_h, query)
+   if input_type == "passivedns":
+      # 1591308018.468719||194.41.152.136||144.76.2.9||IN||mail.putar.ch.||A||85.10.194.107||600||1
+      (ts, client_ip, server_ip, qclass, query, qtype, answer, ttl, whut) = line.split("||")
+   elif (input_type == "bro") or (input_type == "zeek"):
+      #fields ts      uid     id.orig_h       id.orig_p       id.resp_h       id.resp_p       proto   trans_id        rtt     query   qclass  qclass_name     qtype   qtype_name      rcode   rcode_name      AA      TC      RD      RA      Z       answers TTLs    rejected
+      #types  time    string  addr    port    addr    port    enum    count   interval        string  count   string  count   string  count   string  bool    bool    bool    bool    count   vector[string]  vector[interval]        bool
+      (ts, uid, id_orig_h, id_orig_p, id_resp_h, id_resp_p, proto, trans_id, rtt, query, qclass, qclass_name, qtype, qtype_name, rcode, rcode_name, AA, TC, RD, RA, Z, answers, TTLs, rejected) = line.split("\t")
+      (qtype, client_ip, query) = (qtype_name, id_orig_h, query)
+   else:
+       raise NotImplementedError("input_type \"{}\" not supported in conf".format(input_type))
    if qtype in trigger_query_types:
       if is_local_ip(client_ip):
          linecount = linecount+1
