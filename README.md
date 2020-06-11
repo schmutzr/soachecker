@@ -4,6 +4,19 @@ fetches SOA for last seen object in passivedns stream
 
 SOA serves as an additional intel source for suspect domains
 
+## Installation
+config: edit the `soachecker.conf` file, especially the `local_nets`, `stop_list` and `passivedns_log_file` parameters.
+
+The associated `Pipfile` contains all dependencies, install by:
+```
+pipenv install
+```
+
+run:
+```
+pipen run python soachecker.py
+```
+
 ## Operation
 workers: a bunch of worker-threads is created, all listening on a single task-queue
 - a SOA-request is issued for every key (host/domain-name) encountered, most of the time this will fail
