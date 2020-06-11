@@ -1,1 +1,4 @@
 appl
+.*
+Pipfile.lock
+pygtail.offset

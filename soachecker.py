@@ -10,12 +10,14 @@ import re
 
 import configparser
 import logging
+import logging.handlers
 import json
 
 import threading
 import queue
 import time
 
+# CONFIG
 config = configparser.ConfigParser()
 config.read("soachecker.conf")
 
@@ -26,11 +28,21 @@ resolver_timeout = config["soachecker"]["resolver_timeout"]
 resolver_lifetime = config["soachecker"]["resolver_lifetime"]
 passivedns_log_file = config["soachecker"]["passivedns_log_file"] 
 passivedns_separator = config["soachecker"]["passivedns_separator"]
+passivedns_separator = "\t"
 
 trigger_query_types = json.loads(config["soachecker"]["trigger_query_types"])
 
-maxlines = config["soachecker"]["maxlines"] 
+maxlines = int(config["soachecker"]["maxlines"])
 passivedns_skip_re = re.compile(config["soachecker"]["passivedns_skip_re"])
+
+
+# LOGGING
+logger = logging.getLogger('soachecker')
+logger.setLevel(logging.INFO)
+handler = logging.handlers.SysLogHandler(address = '/var/run/syslog')
+logger.addHandler(handler)
+
+
 
 ## for testing only
 #import random
@@ -76,6 +88,7 @@ class WorkerPool:
     
     def report(self):
         print("request_qsize={}, result_qsize={}, workers={} \n".format(self.request_queue.qsize(), self.result_queue.qsize(), threading.active_count()))
+        logger.info("request_qsize=%d, result_qsize=%d, workers=%d \n", self.request_queue.qsize(), self.result_queue.qsize(), threading.active_count())
         if self.report_func != None:
             self.report_func()
 
