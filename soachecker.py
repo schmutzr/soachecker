@@ -24,8 +24,8 @@ config.read("soachecker.conf")
 local_nets = [ ipaddress.ip_network(x) for x in json.loads(config["soachecker"]["local_nets"]) ]
 stop_list = [ re.compile(x) for x in json.loads(config["soachecker"]["stop_list"]) ]
 cache_clean_interval = config["soachecker"]["cache_clean_interval"]
-resolver_timeout = config["soachecker"]["resolver_timeout"]
-resolver_lifetime = config["soachecker"]["resolver_lifetime"]
+resolver_timeout = int(config["soachecker"]["resolver_timeout"])
+resolver_lifetime = int(config["soachecker"]["resolver_lifetime"])
 passivedns_log_file = config["soachecker"]["passivedns_log_file"] 
 passivedns_separator = config["soachecker"]["passivedns_separator"]
 passivedns_separator = "\t"
@@ -39,7 +39,7 @@ passivedns_skip_re = re.compile(config["soachecker"]["passivedns_skip_re"])
 # LOGGING
 logger = logging.getLogger('soachecker')
 logger.setLevel(logging.INFO)
-handler = logging.handlers.SysLogHandler(address = '/var/run/syslog')
+handler = logging.handlers.SysLogHandler(address = '/var/run/syslog') # this is for macos, for GNU/Linux use /dev/log
 logger.addHandler(handler)
 
 
