@@ -161,29 +161,28 @@ def fetch_soa(query):
       if rex.search(query):
          return None
 
-   query = query.split(".")
-   while len(query)>1 :
-      try:
-         key = ".".join(query)
-         if key in cache:
-            counter['cachehits'] = counter['cachehits']+1
-            if time.time() < cache[key]:
-               return None
-            else:
-               counter['cacheexpires'] = counter['cacheexpires']+1
-               counter['cachesize'] = counter['cachesize']-1
-               # TODO: in manage_cache(): del cache[key]
-               #print("   {} in cache (expired), deleting from cache".format(key))
-         else:
-            counter['cachemisses'] = counter['cachemisses']+1
-         counter['requests'] = counter['requests']+1
-         answers = resolver.query(key, "SOA")
-         # cache[key] = answers.rrset.ttl + time.time()
-         counter['cachesize'] = counter['cachesize']+1
-         return (key, answers.rrset.ttl + time.time())
-      except:
-         counter['reqfails'] = counter['reqfails']+1
-      query.pop(0)
+   if query in cache:
+      counter['cachehits'] = counter['cachehits']+1
+      if time.time() < cache[key]:
+         return None
+      else:
+         counter['cacheexpires'] = counter['cacheexpires']+1
+         counter['cachesize'] = counter['cachesize']-1
+         # TODO: in manage_cache(): del cache[key]
+         #print("   {} in cache (expired), deleting from cache".format(key))
+   else:
+      counter['cachemisses'] = counter['cachemisses']+1
+   counter['requests'] = counter['requests']+1
+   try:
+      zone = dns.resolver.zone_for_name(query)
+      soa = (dns.resolver.query(zone, rdtype="SOA"))[0]
+      logger.debug(soa.to_text())
+
+      # cache[query] = answers.rrset.ttl + time.time()
+      counter['cachesize'] = counter['cachesize']+1
+      return (query, soa.ttl + time.time())
+   except:
+      counter['reqfails'] = counter['reqfails']+1
    return None
 
 
