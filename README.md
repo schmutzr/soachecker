@@ -3,3 +3,16 @@
 fetches SOA for last seen object in passivedns stream
 
 SOA serves as an additional intel source for suspect domains
+
+## Operation
+workers: a bunch of worker-threads is created, all listening on a single task-queue
+- a SOA-request is issued for every key (host/domain-name) encountered, most of the time this will fail
+   - before a request is made, the internal cache (maintained by collector, below) is checked to avoid excessive idential queries
+   - if the initial request failed, the key is shortened by the leave-element (LSE) and the request is repeated
+   - this process is repeated until a valid SOA could be retrieved or the key consist only of a TLD
+- resolved SOA are fed into the result-queue
+
+feeder: one (main) thread reads (by pygtail) the passivedns/bro/zeek log file, filters internal requests of certain types and feeds the task-queue
+
+collector: one thread reads the result-queue and manages the internal cache
+- at given intervals the cache is cleaned based on the TTL from the response (still it might get really big in corporate environments)
