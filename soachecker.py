@@ -17,6 +17,8 @@ import threading
 import queue
 import time
 
+import sysconfig
+
 # CONFIG
 config = configparser.ConfigParser()
 config.read("soachecker.conf")
@@ -38,7 +40,17 @@ input_skip_re = re.compile(config["soachecker"]["input_skip_re"])
 # LOGGING
 logger = logging.getLogger('soachecker')
 logger.setLevel(logging.INFO)
-handler = logging.handlers.SysLogHandler(address = '/var/run/syslog') # this is for macos, for GNU/Linux use /dev/log
+
+os = sysconfig.get_platform()
+log_device = '/dev/log'
+if re.match('^macosx', os):
+    log_device = '/var/run/syslog'
+elif re.match('^freebsd', os):
+    log_device = '/var/run/log'
+elif re.match('^linux', os):
+    log_device = '/dev/log'
+   
+handler = logging.handlers.SysLogHandler(address = log_device) # this is for macos, for GNU/Linux use /dev/log
 logger.addHandler(handler)
 
 
