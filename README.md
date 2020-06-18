@@ -19,10 +19,9 @@ pipen run python soachecker.py
 
 ## Operation
 workers: a bunch of worker-threads is created, all listening on a single task-queue
-- a SOA-request is issued for every key (host/domain-name) encountered, most of the time this will fail
+- a SOA-request is issued for every key (host/domain-name) encountered
    - before a request is made, the internal cache (maintained by collector, below) is checked to avoid excessive idential queries
-   - if the initial request failed, the key is shortened by the leave-element (LSE) and the request is repeated
-   - this process is repeated until a valid SOA could be retrieved or the key consist only of a TLD
+   - dns.resolver.zone_for_name() to determine zone-top
 - resolved SOA are fed into the result-queue
 
 feeder: one (main) thread reads (by pygtail) the passivedns/bro/zeek log file, filters internal requests of certain types and feeds the task-queue
