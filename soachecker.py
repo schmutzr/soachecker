@@ -19,25 +19,32 @@ import time
 
 import sysconfig
 
+###
 # CONFIG
+
 config = configparser.ConfigParser()
 config.read("soachecker.conf")
 
 local_nets = [ ipaddress.ip_network(x) for x in json.loads(config["soachecker"]["local_nets"]) ]
 stop_list = [ re.compile(x) for x in json.loads(config["soachecker"]["stop_list"]) ]
-cache_clean_interval = config["soachecker"]["cache_clean_interval"]
+cache_clean_interval = int(config["soachecker"]["cache_clean_interval"])
 resolver_timeout = float(config["soachecker"]["resolver_timeout"])
 resolver_lifetime = float(config["soachecker"]["resolver_lifetime"])
 input_log_file = config["soachecker"]["input_log_file"] 
 input_type = config["soachecker"]["input_type"]
+num_workers = int(config["soachecker"]["num_workers"])
 
 trigger_query_types = json.loads(config["soachecker"]["trigger_query_types"])
 
 maxlines = int(config["soachecker"]["maxlines"])
 input_skip_re = re.compile(config["soachecker"]["input_skip_re"])
 
+pygtail_offset_file = config["soachecker"]["pygtail_offset_file"]
 
+
+###
 # LOGGING
+
 logger = logging.getLogger('soachecker')
 logger.setLevel(logging.INFO)
 
@@ -50,22 +57,14 @@ elif re.match('^freebsd', os):
 elif re.match('^linux', os):
     log_device = '/dev/log'
    
-handler = logging.handlers.SysLogHandler(address = log_device) # this is for macos, for GNU/Linux use /dev/log
+handler = logging.handlers.SysLogHandler(address = log_device)
 logger.addHandler(handler)
 
 
 
-## for testing only
-#import random
+###
+# Threading Definitions
 
-#def worker_func(element):
-#    time.sleep(random.random()) # Testing only
-#    return(element)
-#    
-#def collector_func(element):
-#    time.sleep(random.random()/2) # Testing only
-#    print(element)
-    
 class WorkerPool:
     def __init__(self, worker_func=None, collector_func=None, report_func=None, report_interval=2, numworkers=10):
         self.numworkers = numworkers
@@ -98,7 +97,6 @@ class WorkerPool:
                 self.collector_func(element)
     
     def report(self):
-        print("request_qsize={}, result_qsize={}, workers={} \n".format(self.request_queue.qsize(), self.result_queue.qsize(), threading.active_count()))
         logger.info("request_qsize=%d, result_qsize=%d, workers=%d \n", self.request_queue.qsize(), self.result_queue.qsize(), threading.active_count())
         if self.report_func != None:
             report = self.report_func()
@@ -145,10 +143,10 @@ class WorkerPool:
     
     def put_task(self, element):
         self.request_queue.put(element)
-        
 
 
-# 1591349380.347551||2001:1700:a02:8::12||2a00:17c8::200||IN||aUToDisCovER.PoSt.ch.||CNAME||outlook.post.ch.||3600||1
+###
+# State/Counters
 
 counter = { 'processed':0, 'requests':0, 'reqfails':0, 'cachesize':0, 'cachehits':0, 'cachemisses':0, 'cacheexpires':0 }
 cache = {}
@@ -158,6 +156,11 @@ resolver.timeout = resolver_timeout
 resolver.lifetime = resolver_lifetime
 
 cache_lock = threading.Lock()
+
+
+
+###
+# Callbacks
 
 def manage_cache(element):
     (key, ttl) = element
@@ -197,9 +200,16 @@ def fetch_soa(query):
       counter['reqfails'] = counter['reqfails']+1
    return None
 
+def cleanup_cache():
+   now = time.time()
+   cache =  { key:expires for key,expires in cache.items() if expires<now }
+
+def report_stats():
+    return str(counter)
 
 
-
+###
+# Helpers
 
 def is_local_ip(ip):
    if type(ip)==str:
@@ -212,22 +222,16 @@ def is_local_ip(ip):
    return local_ip
 
 
-def cleanup_cache():
-   now = time.time()
-   cache =  { key:expires for key,expires in cache.items() if expires<now }
 
-def report_stats():
-    return str(counter)
-#    for key in counter:
-#       print("\t{}:\t{}".format(key, counter[key]))
-
+###################
+# MAIN
 # __main__
 linecount = 0
 
-wp = WorkerPool(worker_func=fetch_soa, collector_func=manage_cache, report_func=report_stats, numworkers=300)
+wp = WorkerPool(worker_func=fetch_soa, collector_func=manage_cache, report_func=report_stats, numworkers=num_workers)
 wp.start()
 
-for line in Pygtail(input_log_file, offset_file="pygtail.offset"):
+for line in Pygtail(input_log_file, offset_file=pygtail_offset_file):
    if input_skip_re.match(line):
        continue
    if input_type == "passivedns":
